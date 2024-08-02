@@ -1,13 +1,12 @@
 import json
 import os
 import urllib.request
+from threading import Thread
+from time import sleep
 
 import schedule
 import zmq
-
-from dotenv import load_dotenv, dotenv_values
-from threading import Thread
-from time import sleep
+from dotenv import load_dotenv
 
 load_dotenv()
 
