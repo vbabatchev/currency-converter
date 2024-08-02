@@ -1,11 +1,15 @@
 import json
+import os
 import urllib.request
 
 import schedule
 import zmq
 
+from dotenv import load_dotenv, dotenv_values
 from threading import Thread
 from time import sleep
+
+load_dotenv()
 
 SUPPORTED_CURRENCIES = {
     "USD": "United States Dollar",
@@ -17,7 +21,7 @@ SUPPORTED_CURRENCIES = {
 # FXRatesAPI configuration
 FXRATES_API_URL = "https://api.fxratesapi.com/latest"
 # Enter your own API key here
-FXRATES_API_KEY = "fxr_live_307dded1f0e5e27ec42658f771b15698d130"
+FXRATES_API_KEY = os.getenv("FXRATES_TOKEN")
 
 # Define server socket  using IPC
 context = zmq.Context()
