@@ -1,3 +1,40 @@
+"""
+currency_converter.py
+
+A simple currency conversion service that fetches exchange rates from
+the FXRatesAPI and provides functionality to convert currencies, get
+exchange rates, and list supported currencies.
+
+This module performs the following tasks:
+- Loads environment variables from a .env file using `dotenv`.
+- Fetches and updates exchange rates from an external API.
+- Provides currency conversion functionality.
+- Responds to requests via a ZeroMQ (zmq) IPC socket.
+- Periodically updates exchange rates using the `schedule` library.
+
+Key Components:
+- `fetch_exchange_rates(base: str)`
+- `fetch_all_exchange_rates()`
+- `schedule_thread()`
+- `handle_convert_currency(data: dict)`
+- `handle_get_exchange_rates(data: dict)`
+- `handle_get_supported_currencies()`
+
+The script initializes a ZeroMQ REP socket for IPC communication, starts
+a background thread for scheduling tasks, and continuously processes
+incoming messages until a shutdown signal is received.
+
+Dependencies:
+- `json`: For JSON data handling.
+- `os`: For environment variable access.
+- `urllib.request`: For making HTTP requests.
+- `threading`: For concurrent execution of tasks.
+- `time`: For sleep functionality.
+- `schedule`: For scheduling periodic tasks.
+- `zmq`: For ZeroMQ socket communication.
+- `dotenv`: For loading environment variables from a .env file.
+"""
+
 import json
 import os
 import urllib.request
@@ -31,6 +68,14 @@ shutdown_event = Event()
 
 
 def fetch_exchange_rates(base: str) -> dict | None:
+    """Fetch exchange rates from the FXRatesAPI for a given base
+    currency.
+
+    :param base: string representation of the base currency code for which
+                 which exchange rates are fetched
+    :returns: a dictionary of exchange rates for the base currency if
+             successfuly, otherwise None if there was an error
+    """
     currencies = ",".join(filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys()))
     try:
         url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
@@ -43,6 +88,9 @@ def fetch_exchange_rates(base: str) -> dict | None:
 
 
 def fetch_all_exchange_rates():
+    """Fetch exchange rates for all supported currencies and update the
+    gloabl 'exchange_rates' dictionary.
+    """
     global exchange_rates
     new_rates = {}
     for currency_code in SUPPORTED_CURRENCIES.keys():
@@ -57,12 +105,22 @@ def fetch_all_exchange_rates():
 
 
 def schedule_thread():
+    """Run a thread that periodically runs scheduled tasks."""
     while not shutdown_event.is_set():
         schedule.run_pending()
         sleep(1)
 
 
 def handle_convert_currency(data: dict) -> dict:
+    """Convert an amount from one currency to another using the current
+    exchange rates.
+
+    :param data: a dictionary containing 'source_currency',
+                'target_currency', and 'amount'
+    :returns: a dictionary containing the source and target currency
+              codes, original amount, and converted amount, or an error
+              message if conversion fails
+    """
     source_currency = data.get("source_currency")
     target_currency = data.get("target_currency")
     amount = data.get("amount")
@@ -92,6 +150,12 @@ def handle_convert_currency(data: dict) -> dict:
 
 
 def handle_get_exchange_rates(data: dict) -> dict:
+    """Retrieve exchange rates for a specified currency code.
+
+    :param data: a dictionary containing 'currency_code'
+    :returns: a dictionary of exchange rates for the specified currency
+              or an error message if the code is invalid
+    """
     currency_code = data.get("currency_code")
 
     if currency_code not in exchange_rates:
@@ -101,6 +165,12 @@ def handle_get_exchange_rates(data: dict) -> dict:
 
 
 def handle_get_supported_currencies() -> dict[str, str]:
+    """Retrieve a sorted list of supported currency codes and their
+    corresponding names.
+
+    :returns: a dictionary of supported currency codes and their
+              corresponding names
+    """
     sorted_currencies = dict(sorted(SUPPORTED_CURRENCIES.items()))
     return sorted_currencies
 
