@@ -1,6 +1,7 @@
-import zmq
-import urllib.request
 import json
+import urllib.request
+
+import zmq
 
 SUPPORTED_CURRENCIES = {
     "USD": "United States Dollar",
@@ -22,24 +23,26 @@ socket.bind("ipc:///tmp/currency_converter")
 exchange_rates = {}
 
 
-def fetch_exchange_rates():
+def fetch_exchange_rates(base):
+    currencies = ",".join(filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys()))
+    rates = {}
     try:
-        for base in SUPPORTED_CURRENCIES.keys():
-            currencies = ",".join(
-                filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys())
-            )
-            url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
-            with urllib.request.urlopen(url) as response:
-                data = json.loads(response.read().decode())
-                base_currency = data.get("base")
-                rates = data.get("rates")
-
-                global exchange_rates
-                exchange_rates[base_currency] = rates
+        url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode())
+            base_currency = data.get("base")
+            rates = data.get("rates")
     except Exception as error:
         print(f"Failed to fetch exchange rates: {error}")
-    else:
-        print("Exchange rates updated")
+    finally:
+        return rates
+
+
+def fetch_all_exchange_rates():
+    exchange_rates = {}
+    for currency_code in SUPPORTED_CURRENCIES.keys():
+        exchange_rates[currency_code] = fetch_exchange_rates(currency_code)
+    return exchange_rates
 
 
 def handle_convert_currency(data):
