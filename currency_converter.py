@@ -34,7 +34,7 @@ exchange_rates = {}
 exchange_rates_lock = Lock()
 
 
-def fetch_exchange_rates(base):
+def fetch_exchange_rates(base: str) -> dict | None:
     currencies = ",".join(filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys()))
     try:
         url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
@@ -77,7 +77,7 @@ def schedule_thread():
 Thread(target=schedule_thread, daemon=True).start()
 
 
-def handle_convert_currency(data):
+def handle_convert_currency(data: dict) -> dict:
     source_currency = data.get("source_currency")
     target_currency = data.get("target_currency")
     amount = data.get("amount")
@@ -106,7 +106,7 @@ def handle_convert_currency(data):
     }
 
 
-def handle_get_exchange_rates(data):
+def handle_get_exchange_rates(data: dict) -> dict:
     currency_code = data.get("currency_code")
 
     if currency_code not in exchange_rates:
