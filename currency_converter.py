@@ -82,14 +82,22 @@ def handle_convert_currency(data):
     target_currency = data.get("target_currency")
     amount = data.get("amount")
 
-    if (
-        source_currency not in exchange_rates
-        or target_currency not in exchange_rates[source_currency]
-    ):
-        return {"error": "Invalid currency code"}
+    if not isinstance(amount, (int, float)):
+        return {"error": "Amount must be a number"}
 
-    exchange_rate = exchange_rates[source_currency][target_currency]
-    converted_amount = amount * exchange_rate
+    with exchange_rates_lock:
+        if (
+            source_currency not in exchange_rates
+            or target_currency not in exchange_rates[source_currency]
+        ):
+            return {"error": "Invalid currency code"}
+
+        exchange_rate = exchange_rates[source_currency].get(target_currency)
+        if exchange_rate is None:
+            return {"error": "Exchange rate not available"}
+
+        converted_amount = amount * exchange_rate
+
     return {
         "source_currency": source_currency,
         "target_currency": target_currency,
