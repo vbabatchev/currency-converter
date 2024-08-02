@@ -22,6 +22,9 @@ FXRATES_API_URL = "https://api.fxratesapi.com/latest"
 # Enter your own API key here
 FXRATES_API_KEY = os.getenv("FXRATES_TOKEN")
 
+if not FXRATES_API_KEY:
+    raise EnvironmentError("FXRATES_TOKEN is not set in the environment variables")
+
 # Define server socket  using IPC
 context = zmq.Context()
 socket = context.socket(zmq.REP)
