@@ -1,7 +1,11 @@
 import json
 import urllib.request
 
+import schedule
 import zmq
+
+from threading import Thread
+from time import sleep
 
 SUPPORTED_CURRENCIES = {
     "USD": "United States Dollar",
@@ -19,8 +23,6 @@ FXRATES_API_KEY = "fxr_live_307dded1f0e5e27ec42658f771b15698d130"
 context = zmq.Context()
 socket = context.socket(zmq.REP)
 socket.bind("ipc:///tmp/currency_converter")
-
-exchange_rates = {}
 
 
 def fetch_exchange_rates(base):
@@ -43,6 +45,23 @@ def fetch_all_exchange_rates():
     for currency_code in SUPPORTED_CURRENCIES.keys():
         exchange_rates[currency_code] = fetch_exchange_rates(currency_code)
     return exchange_rates
+
+
+# Populate exchange rates upon starting the service
+exchange_rates = fetch_all_exchange_rates()
+
+# Schedule exchange rate updates every hour
+schedule.every().hour.do(fetch_all_exchange_rates)
+
+
+def schedule_thread():
+    while True:
+        schedule.run_pending()
+        sleep(1)
+
+
+# Start the schedule thread
+Thread(target=schedule_thread, daemon=True).start()
 
 
 def handle_convert_currency(data):
