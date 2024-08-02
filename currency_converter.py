@@ -1,7 +1,7 @@
 import json
 import os
 import urllib.request
-from threading import Thread
+from threading import Lock, Thread
 from time import sleep
 
 import schedule
@@ -30,30 +30,38 @@ context = zmq.Context()
 socket = context.socket(zmq.REP)
 socket.bind("ipc:///tmp/currency_converter")
 
+exchange_rates = {}
+exchange_rates_lock = Lock()
+
 
 def fetch_exchange_rates(base):
     currencies = ",".join(filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys()))
-    rates = {}
     try:
         url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
-            rates = data.get("rates")
+            return data.get("rates", {})
     except Exception as error:
         print(f"Failed to fetch exchange rates: {error}")
-    finally:
-        return rates
+        return None
 
 
 def fetch_all_exchange_rates():
-    exchange_rates = {}
+    global exchange_rates
+    new_rates = {}
     for currency_code in SUPPORTED_CURRENCIES.keys():
-        exchange_rates[currency_code] = fetch_exchange_rates(currency_code)
-    return exchange_rates
+        rates = fetch_exchange_rates(currency_code)
+        if rates is not None:
+            new_rates[currency_code] = rates
+
+    with exchange_rates_lock:
+        exchange_rates = new_rates
+
+    print("Exchange rates updated.")
 
 
 # Populate exchange rates upon starting the service
-exchange_rates = fetch_all_exchange_rates()
+fetch_all_exchange_rates()
 
 # Schedule exchange rate updates every hour
 schedule.every().hour.do(fetch_all_exchange_rates)
