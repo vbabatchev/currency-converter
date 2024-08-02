@@ -32,7 +32,6 @@ def fetch_exchange_rates(base):
         url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
-            base_currency = data.get("base")
             rates = data.get("rates")
     except Exception as error:
         print(f"Failed to fetch exchange rates: {error}")
