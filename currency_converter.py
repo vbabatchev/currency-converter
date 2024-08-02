@@ -42,7 +42,7 @@ def fetch_exchange_rates(base: str) -> dict | None:
             data = json.loads(response.read().decode())
             return data.get("rates", {})
     except Exception as error:
-        print(f"Failed to fetch exchange rates: {error}")
+        print(f"Failed to fetch exchange rates for {base}: {error}")
         return None
 
 
@@ -137,3 +137,4 @@ while True:
         socket.send_json(response)
     except Exception as e:
         print(f"Error: {e}")
+        socket.send_json({"error": str(e)})
