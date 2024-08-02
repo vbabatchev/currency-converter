@@ -42,6 +42,27 @@ def fetch_exchange_rates():
         print("Exchange rates updated")
 
 
+def handle_convert_currency(data):
+    source_currency = data.get("source_currency")
+    target_currency = data.get("target_currency")
+    amount = data.get("amount")
+
+    if (
+        source_currency not in exchange_rates
+        or target_currency not in exchange_rates[source_currency]
+    ):
+        return {"error": "Invalid currency code"}
+
+    exchange_rate = exchange_rates[source_currency][target_currency]
+    converted_amount = amount * exchange_rate
+    return {
+        "source_currency": source_currency,
+        "target_currency": target_currency,
+        "amount": amount,
+        "converted_amount": converted_amount,
+    }
+
+
 def handle_get_exchange_rates(data):
     currency_code = data.get("currency_code")
 
@@ -60,7 +81,9 @@ while True:
     message = socket.recv_json()
     action = message.get("action")
     data = message.get("data")
-    if action == "get_exchange_rates":
+    if action == "convert_currency":
+        response = handle_convert_currency(data)
+    elif action == "get_exchange_rates":
         response = handle_get_exchange_rates(data)
     elif action == "get_supported_currencies":
         response = handle_get_supported_currencies()
