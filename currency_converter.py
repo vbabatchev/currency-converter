@@ -1,7 +1,7 @@
 import json
 import os
 import urllib.request
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 from time import sleep
 
 import schedule
@@ -25,13 +25,9 @@ FXRATES_API_KEY = os.getenv("FXRATES_TOKEN")
 if not FXRATES_API_KEY:
     raise EnvironmentError("FXRATES_TOKEN is not set in the environment variables")
 
-# Define server socket  using IPC
-context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind("ipc:///tmp/currency_converter")
-
 exchange_rates = {}
 exchange_rates_lock = Lock()
+shutdown_event = Event()
 
 
 def fetch_exchange_rates(base: str) -> dict | None:
@@ -60,21 +56,10 @@ def fetch_all_exchange_rates():
     print("Exchange rates updated.")
 
 
-# Populate exchange rates upon starting the service
-fetch_all_exchange_rates()
-
-# Schedule exchange rate updates every hour
-schedule.every().hour.do(fetch_all_exchange_rates)
-
-
 def schedule_thread():
-    while True:
+    while not shutdown_event.is_set():
         schedule.run_pending()
         sleep(1)
-
-
-# Start the schedule thread
-Thread(target=schedule_thread, daemon=True).start()
 
 
 def handle_convert_currency(data: dict) -> dict:
@@ -120,21 +105,53 @@ def handle_get_supported_currencies() -> dict[str, str]:
     return sorted_currencies
 
 
-while True:
-    try:
-        message = socket.recv_json()
-        action = message.get("action")
-        data = message.get("data")
-        if action == "convert_currency":
-            response = handle_convert_currency(data)
-        elif action == "get_exchange_rates":
-            response = handle_get_exchange_rates(data)
-        elif action == "get_supported_currencies":
-            response = handle_get_supported_currencies()
-        else:
-            response = {"error": "Unknown action"}
+try:
+    # Define server socket  using IPC
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("ipc:///tmp/currency_converter")
 
-        socket.send_json(response)
-    except Exception as e:
-        print(f"Error: {e}")
-        socket.send_json({"error": str(e)})
+    # Populate exchange rates upon starting the service
+    fetch_all_exchange_rates()
+
+    # Schedule exchange rate updates every hour
+    schedule.every().hour.do(fetch_all_exchange_rates)
+
+    # Start the schedule thread
+    scheduler_thread = Thread(target=schedule_thread, daemon=True)
+    scheduler_thread.start()
+
+    while not shutdown_event.is_set():
+        try:
+            message = socket.recv_json(flags=zmq.NOBLOCK)
+            action = message.get("action")
+            data = message.get("data")
+            if action == "convert_currency":
+                response = handle_convert_currency(data)
+            elif action == "get_exchange_rates":
+                response = handle_get_exchange_rates(data)
+            elif action == "get_supported_currencies":
+                response = handle_get_supported_currencies()
+            else:
+                response = {"error": "Unknown action"}
+
+            socket.send_json(response)
+        except zmq.Again:
+            sleep(1)  # No message received, sleep briefly
+        except Exception as e:
+            print(f"Error: {e}")
+            socket.send_json({"error": str(e)})
+
+except KeyboardInterrupt:
+    print("\nKeyboard interrupt received, shutting down...")
+except Exception as e:
+    print("Unexpected error: {e}")
+finally:
+    print("Cleaning up resources...")
+    shutdown_event.set()
+    # Wait for the scheduler thread to finish
+    scheduler_thread.join()
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.close()
+    context.term()
+    print("Service stopped.")
