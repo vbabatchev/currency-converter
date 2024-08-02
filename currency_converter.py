@@ -49,3 +49,22 @@ def handle_get_exchange_rates(data):
         return {"error": "Invalid currency code"}
 
     return exchange_rates[currency_code]
+
+
+def handle_get_supported_currencies() -> dict[str, str]:
+    sorted_currencies = dict(sorted(SUPPORTED_CURRENCIES.items()))
+    return sorted_currencies
+
+
+while True:
+    message = socket.recv_json()
+    action = message.get("action")
+    data = message.get("data")
+    if action == "get_exchange_rates":
+        response = handle_get_exchange_rates(data)
+    elif action == "get_supported_currencies":
+        response = handle_get_supported_currencies()
+    else:
+        response = {"error": "Unknown action"}
+
+    socket.send_json(response)
