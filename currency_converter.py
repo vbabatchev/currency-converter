@@ -78,16 +78,19 @@ def handle_get_supported_currencies() -> dict[str, str]:
 
 
 while True:
-    message = socket.recv_json()
-    action = message.get("action")
-    data = message.get("data")
-    if action == "convert_currency":
-        response = handle_convert_currency(data)
-    elif action == "get_exchange_rates":
-        response = handle_get_exchange_rates(data)
-    elif action == "get_supported_currencies":
-        response = handle_get_supported_currencies()
-    else:
-        response = {"error": "Unknown action"}
+    try:
+        message = socket.recv_json()
+        action = message.get("action")
+        data = message.get("data")
+        if action == "convert_currency":
+            response = handle_convert_currency(data)
+        elif action == "get_exchange_rates":
+            response = handle_get_exchange_rates(data)
+        elif action == "get_supported_currencies":
+            response = handle_get_supported_currencies()
+        else:
+            response = {"error": "Unknown action"}
 
-    socket.send_json(response)
+        socket.send_json(response)
+    except Exception as e:
+        print(f"Error: {e}")
