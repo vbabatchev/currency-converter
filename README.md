@@ -11,6 +11,7 @@ and updates them hourly. The service handles conversion requests using pre-fetch
     - [Requesting Data](#requesting-data)
     - [Receiving Data](#receiving-data)
     - [Example Call](#example-call)
+    - [UML Sequence](#uml-sequence)
 
 ## Prerequisites
 
@@ -172,3 +173,5 @@ response = socket.recv_json()
 print("Converted Amount:", round(response["converted_amount"], 2))
 ```
 
+### UML Sequence
+![Currency Converter Sequence Diagram](uml_sequence.png)
