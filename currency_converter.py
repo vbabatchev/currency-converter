@@ -14,7 +14,13 @@ This module performs the following tasks:
 
 Key Components:
 - `fetch_exchange_rates(base: str)`
-- `fetch_all_exchange_rates()`
+- `calculate_exchange_rate(
+       base_currency: str,
+       src_currency: str,
+       tgt_currency: str,
+       rates: dict[str, float]
+    )`
+- `update_all_exchange_rates(base: str, rates: dict[str, float])`
 - `schedule_thread()`
 - `handle_convert_currency(data: dict)`
 - `handle_get_exchange_rates(data: dict)`
@@ -67,39 +73,62 @@ exchange_rates_lock = Lock()
 shutdown_event = Event()
 
 
-def fetch_exchange_rates(base: str) -> dict | None:
+def fetch_exchange_rates(base: str = "USD"):
     """Fetch exchange rates from the FXRatesAPI for a given base
-    currency.
+    currency and update all exchange rates.
 
-    :param base: string representation of the base currency code for which
-                 which exchange rates are fetched
-    :returns: a dictionary of exchange rates for the base currency if
-             successfuly, otherwise None if there was an error
+    :param base: base currency code, default is 'USD'
     """
     currencies = ",".join(filter(lambda x: x != base, SUPPORTED_CURRENCIES.keys()))
     try:
         url = f"{FXRATES_API_URL}?api_key={FXRATES_API_KEY}&currencies={currencies}&base={base}"
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
-            return data.get("rates", {})
+            base_currency = data.get("base")
+            rates = data.get("rates")
+            update_all_exchange_rates(base_currency, rates)
     except Exception as error:
         print(f"Failed to fetch exchange rates for {base}: {error}")
-        return None
 
 
-def fetch_all_exchange_rates():
-    """Fetch exchange rates for all supported currencies and update the
-    gloabl 'exchange_rates' dictionary.
+def calculate_exchange_rate(
+    base_currency: str, src_currency: str, tgt_currency: str, rates: dict[str, float]
+) -> float:
+    """Calculates the exchange rate from one currency to another.
+
+    :param base_currency: the base currency code
+    :param src_currency: the source currency code
+    :param tgt_currency: the target currency code
+    :param rates: dictionary containing the exchange rates for the base
     """
-    global exchange_rates
-    new_rates = {}
-    for currency_code in SUPPORTED_CURRENCIES.keys():
-        rates = fetch_exchange_rates(currency_code)
-        if rates is not None:
-            new_rates[currency_code] = rates
+    if src_currency == base_currency:
+        return rates[tgt_currency]
+    if tgt_currency == base_currency:
+        return 1 / rates[src_currency]
+    return rates[tgt_currency] / rates[src_currency]
 
+
+def update_all_exchange_rates(base: str, rates: dict[str, float]) -> None:
+    """Calculates and updates the exchange rates between all of the
+    supported currencies.
+
+    :param base: base currency code
+    :param rates: dictionary containing the exchange rates for the base
+    """
+    if None in (base, rates):
+        print("Failed to update exchange rates.")
+        return
+
+    currencies = SUPPORTED_CURRENCIES.keys()
     with exchange_rates_lock:
-        exchange_rates = new_rates
+        for src_currency in currencies:
+            exchange_rates[src_currency] = {}
+            for tgt_currency in currencies:
+                if src_currency != tgt_currency:
+                    rate = calculate_exchange_rate(
+                        base, src_currency, tgt_currency, rates
+                    )
+                    exchange_rates[src_currency][tgt_currency] = rate
 
     print("Exchange rates updated.")
 
@@ -182,10 +211,10 @@ try:
     socket.bind("ipc:///tmp/currency_converter")
 
     # Populate exchange rates upon starting the service
-    fetch_all_exchange_rates()
+    fetch_exchange_rates()
 
     # Schedule exchange rate updates every hour
-    schedule.every().hour.do(fetch_all_exchange_rates)
+    schedule.every().hour.do(fetch_exchange_rates)
 
     # Start the schedule thread
     scheduler_thread = Thread(target=schedule_thread, daemon=True)
